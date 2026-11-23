@@ -1,0 +1,3 @@
+#!/bin/bash
+c++ -O3 -shared -std=c++17 -I/usr/include/eigen3/ -fPIC  $(pybind11-config --includes) \
+    src/sim.cpp -o clib/sim$(python3-config --extension-suffix)
