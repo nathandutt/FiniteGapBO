@@ -1,18 +1,19 @@
 #include <pybind11/pybind11.h>
 #include <pybind11/stl.h>
 
-#include <utility>
-#include <fstream>
-#include <sstream>
 #include <iostream>
-#include <Eigen/Dense>
+#include <utility>
 #include <cassert>
+#include <iomanip>
+#define FIXED_FLOAT(x) std::fixed <<std::setprecision(4)<<(x)
+#include <Eigen/Dense>
 
 using namespace std;
 using Matrix = Eigen::MatrixXcd;
 using Vector  = Eigen::VectorXcd;
 using cplx = std::complex<double>;
 const cplx I(0., 1.);
+
 
 //---------------Functions to reconstruct the field from poisson kernels------//
 
@@ -173,14 +174,14 @@ vector<vector<double>> inverseScatter(vector<double> ls, vector<double> phases,
     double cum_err = 0.;
 
     for(const auto t : times){
-	cout << "\r\033[K" << "T= " << t << std::flush;
+	cout << "\r\033[K" << "T= " << FIXED_FLOAT(t) << std::flush;
 	Matrix m_t = fromSpectrum(cs, ls, phases, t);
 	Vector qs_t = diagonalize(m_t, cum_err);
 	vector<double> field_t = fullField(xs, qs_t);
 	all_fields.emplace_back(field_t);
     }
 
-    cout << "Maximal inversion/diagonalization error encountered is: " << cum_err << "\n";
+    cout  << std::defaultfloat<< "\n" << "Maximal inversion/diagonalization error encountered is: " << cum_err << "\n";
     return all_fields;
 }
 
@@ -204,13 +205,13 @@ vector<vector<double>> directEvolve(vector<double> rs, vector<double> shifts, ve
     auto [lax_eigs, Qrotated] = diagonalizeLax(l, qs, cum_err);
 
     for(const auto t : times){
-	cout << "\r\033[K" << "T= " << t << std::flush;
+	cout << "\r\033[K" << "T= " << FIXED_FLOAT(t) << std::flush;
 	Vector qs_t = evolvedQs(lax_eigs, Qrotated, t, cum_err);
 	vector<double> field_t = fullField(xs, qs_t);
 	all_fields.emplace_back(field_t);
     }
 
-    cout << "Maximal inversion/diagonalization error encountered is: " << cum_err << "\n";
+    cout  << std::defaultfloat << "\n" << "Maximal inversion/diagonalization error encountered is: " << cum_err << "\n";
     return all_fields;
 }
 

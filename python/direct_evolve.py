@@ -17,13 +17,13 @@ class DESimulation:
     r_vals     : np.ndarray
     phase_vals : np.ndarray
 
-    xmin : float = -10.
-    xmax : float = 10.
-    xpts : int   = 2000
+    xmin : float = -3*np.pi
+    xmax : float = 3*np.pi
+    xpts : int   = 5000
 
     tmin : float = 0.
     tmax : float = 0.1
-    tpts : int   = 1000
+    tpts : int   = 50
 
     xs    : np.ndarray = field(init=False)
     times : np.ndarray = field(init=False)
@@ -36,6 +36,7 @@ class DESimulation:
         self.field = np.empty(0)
 
     def evolve(self):
+        print(f'\n Evolving from t={self.tmin}, to t={self.tmax} \n')
         self.field = np.asarray(sim.directEvolve(self.r_vals, self.phase_vals, self.times, self.xs))
     
     def plot(self):

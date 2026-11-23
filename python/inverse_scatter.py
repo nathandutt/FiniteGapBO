@@ -22,8 +22,8 @@ class ISTSimulation:
     xpts : int   = 2000
 
     tmin : float = 0.
-    tmax : float = 0.1
-    tpts : int   = 100
+    tmax : float = 0.001
+    tpts : int   = 10
 
     xs    : np.ndarray = field(init=False)
     times : np.ndarray = field(init=False)
@@ -36,6 +36,7 @@ class ISTSimulation:
         self.field = np.empty(0)
 
     def evolve(self):
+        print(f'\n Evolving from t={self.tmin}, to t={self.tmax} \n')
         self.field = np.asarray(sim.inverseScatter(self.lambda_vals, self.norming_constant_vals, self.times, self.xs))
     
     def plot(self):
@@ -61,14 +62,11 @@ class ISTSimulation:
 
 def main():
     N = 100
-    ls = np.linspace(1., 2.*N, N)
+    ls = np.linspace(0.01, 2.*N, N)
     norms = np.zeros(N)
     simu = ISTSimulation(lambda_vals = ls, norming_constant_vals = norms)
     simu.evolve()
     simu.plot()
-
-
-
 
 if __name__ == "__main__":
     main()
