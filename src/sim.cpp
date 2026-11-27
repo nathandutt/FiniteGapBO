@@ -1,11 +1,12 @@
 #include <pybind11/pybind11.h>
 #include <pybind11/stl.h>
+#include <pybind11/eigen.h>
 
 #include <iostream>
 #include <utility>
 #include <cassert>
 #include <iomanip>
-#define FIXED_FLOAT(x) std::fixed <<std::setprecision(4)<<(x)
+#define FIXED_FLOAT(x) std::fixed <<std::setprecision(1)<<(x)
 #include <Eigen/Dense>
 
 using namespace std;
@@ -157,62 +158,90 @@ Vector evolvedQs(const Vector& lax_eigs, const Matrix& Qrotated, double t, doubl
     return eigs;
 }
 
-vector<vector<double>> inverseScatter(vector<double> ls, vector<double> phases, 
-							    vector<double> times, vector<double> xs)
+vector<vector<double>> localIST(const vector<vector<cplx>>& binned_qs){
+    //Assume that binned_qs have been rescaled to bin already
+    int num_bins = binned_qs.size();
+
+    vector<vector<double>> result{};
+    result.reserve(num_bins);
+
+    for(int bin_idx = 0; bin_idx < num_bins; bin_idx++){
+
+	int local_phase_num = binned_qs[bin_idx].size();
+	vector<double> bin_result{};
+	bin_result.reserve(local_phase_num);
+	if (local_phase_num > 0){
+
+	    //Diagonalize local bin lax matrix
+	    Matrix lax_bin = laxFromQs(binned_qs[bin_idx]);
+	    Eigen::ComplexEigenSolver<Matrix> solver(lax_bin);
+	    Vector eigs = solver.eigenvalues();
+	    //No error checking here as bins will usually have smaller amount of phases
+
+	    for(int i = 0; i < local_phase_num; i++){
+		bin_result.emplace_back(eigs(i).real());
+	    }
+	}
+	result.emplace_back(bin_result);
+    }
+    return result;
+}
+
+vector<Vector> inverseScatter(vector<double> ls, vector<double> phases, 
+	vector<double> times)
 {
     /*
      * Calculates the multiphase solution at all given times over the lattice of xs
      * using inverse scattering given the spectrum in "ls", and norming constants in "phases"
      */
-    
+
     //initialize return vector
-    vector<vector<double>> all_fields{}; all_fields.reserve(times.size());
+    vector<Vector> all_qs{}; all_qs.reserve(times.size());
 
     //calculate finitegap coefficients
     vector<cplx> cs = calculateCs(ls);
 
     double cum_err = 0.;
 
+    int num_times = times.size();
+    int i = 0;
     for(const auto t : times){
-	cout << "\r\033[K" << "T= " << FIXED_FLOAT(t) << std::flush;
+	double percent = (double)(100*i)/num_times;
+	i++;
+
+	cout << "\r\033[K" << "---- " << FIXED_FLOAT(percent) << " % Done ----" << std::flush;
 	Matrix m_t = fromSpectrum(cs, ls, phases, t);
 	Vector qs_t = diagonalize(m_t, cum_err);
-	vector<double> field_t = fullField(xs, qs_t);
-	all_fields.emplace_back(field_t);
+	all_qs.emplace_back(qs_t);	
     }
 
-    cout  << std::defaultfloat<< "\n" << "Maximal inversion/diagonalization error encountered is: " << cum_err << "\n";
-    return all_fields;
+    cout  << std::defaultfloat<< "\n" << "Maximal inversion/diagonalization error encountered is: " << cum_err << "\n \n";
+    return all_qs;
 }
 
-vector<vector<double>> directEvolve(vector<double> rs, vector<double> shifts, vector<double> times, vector<double> xs){
-    /*
-     * Evolves the poisson kernels directly, no scattering data
-     */
-    assert((rs.size() == shifts.size()));
-    int N = rs.size();
+vector<Vector> directEvolve(vector<cplx> qs, vector<double> times){
 
-    vector<vector<double>> all_fields{}; all_fields.reserve(times.size());
+    int N = qs.size();
 
-    //Create qs
-    vector<cplx> qs{}; qs.reserve(N);
-    for(int i=0; i<N; i++){
-	qs.emplace_back(rs[i]*exp(-I*shifts[i]));
-    }
+    vector<Vector> all_qs{}; all_qs.reserve(times.size());
 
     Matrix l = laxFromQs(qs);
     double cum_err = 0.;
     auto [lax_eigs, Qrotated] = diagonalizeLax(l, qs, cum_err);
 
+    int num_times = times.size();
+    int i = 0;
     for(const auto t : times){
-	cout << "\r\033[K" << "T= " << FIXED_FLOAT(t) << std::flush;
+	double percent = (double)(100*i)/num_times;
+	i++;
+
+	cout << "\r\033[K" << "---- " << FIXED_FLOAT(percent) << " % Done ----" << std::flush;
 	Vector qs_t = evolvedQs(lax_eigs, Qrotated, t, cum_err);
-	vector<double> field_t = fullField(xs, qs_t);
-	all_fields.emplace_back(field_t);
+	all_qs.emplace_back(qs_t);
     }
 
     cout  << std::defaultfloat << "\n" << "Maximal inversion/diagonalization error encountered is: " << cum_err << "\n";
-    return all_fields;
+    return all_qs;
 }
 
 
@@ -222,4 +251,5 @@ vector<vector<double>> directEvolve(vector<double> rs, vector<double> shifts, ve
 PYBIND11_MODULE(sim, m){
     m.def("inverseScatter", &inverseScatter, "calculate field from scattering data");
     m.def("directEvolve", &directEvolve, "calculate field from intial poisson kernels");
+    m.def("localIST", &localIST, "calculate local lax eigenvals from binned qs");
 }
